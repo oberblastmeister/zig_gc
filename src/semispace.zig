@@ -2,33 +2,25 @@ const std = @import("std");
 
 const GcConfig = @import("GcConfig.zig");
 const object = @import("object.zig");
+const Object = *Header;
 const Header = object.Header;
 const InfoTable = object.InfoTable;
 const RecordInfoTable = object.InfoTable;
 const types = @import("types.zig");
 const types_constructors = @import("types_constructors.zig");
+const shadow_stack = @import("shadow_stack.zig");
 
-const PointerStack = struct {
-    const Self = @This();
-
-    next: ?*Self,
-    pointers: []?**Header,
-
-    fn init(pointers: []**Header) Self {
-        return Self{
-            .next = null,
-            .pointers = pointers,
-        };
-    }
-};
-
-pub fn MakeGC(comptime config: GcConfig) type {
+// config provides:
+//  fn objectSize(object: *Header) usize,
+//  fn processFields(comptime GC: type, gc: *GC, ref: *Header, comptime processField: fn (gc: *GC, **Header) void) void,
+//
+pub fn MakeGC(comptime config: type) type {
     return struct {
-        pub fn objectWordSize(ref: *Header) usize {
+        pub fn objectWordSize(ref: Object) usize {
             return config.objectSize(ref);
         }
 
-        pub fn objectWordSlice(ref: *Header) []usize {
+        pub fn objectWordSlice(ref: Object) []usize {
             const ptr: [*]usize = @ptrCast(ref);
             return ptr[0..objectWordSize(ref)];
         }
@@ -37,7 +29,7 @@ pub fn MakeGC(comptime config: GcConfig) type {
 
         const Self = @This();
 
-        pointer_stack: ?*PointerStack,
+        stack: shadow_stack.Stack,
         to_space: [*]usize,
         from_space: [*]usize,
         extent: usize,
@@ -53,7 +45,7 @@ pub fn MakeGC(comptime config: GcConfig) type {
             const extent = heap.len / 2;
             const top = to_space + extent;
             return .{
-                .pointer_stack = null,
+                .stack = .{ .node = null },
                 .to_space = to_space,
                 .from_space = top,
                 .extent = extent,
@@ -89,11 +81,10 @@ pub fn MakeGC(comptime config: GcConfig) type {
             return ptr;
         }
 
-        pub fn allocRecord(self: *Self, info_table: *const InfoTable) *Header {
-            const record_info = &info_table.body.record;
-            const ptr = self.allocRaw(record_info.size);
-            const header_ptr: *Header = @ptrCast(ptr);
-            header_ptr._info_table = @constCast(info_table);
+        pub fn allocRecord(self: *Self, info_table: *const InfoTable) Object {
+            const ptr = self.allocRaw(info_table.record.size);
+            const header_ptr: Object = @ptrCast(ptr);
+            header_ptr.info_table = info_table;
             return header_ptr;
         }
 
@@ -111,8 +102,8 @@ pub fn MakeGC(comptime config: GcConfig) type {
             self.scan = self.free;
         }
 
-        fn removeWorklist(self: *Self) *Header {
-            const ref: *Header = @ptrCast(self.scan);
+        fn removeWorklist(self: *Self) Object {
+            const ref: Object = @ptrCast(self.scan);
             self.scan += config.objectSize(ref);
             return ref;
         }
@@ -120,14 +111,14 @@ pub fn MakeGC(comptime config: GcConfig) type {
         pub fn collect(self: *Self) void {
             self.flip();
             self.initWorklist();
-            var ptr_stack = self.pointer_stack;
-            while (ptr_stack) |ps| {
+            var node = self.stack.node;
+            while (node) |ps| {
                 for (ps.pointers) |field| {
                     if (field) |it| {
                         self.processField(it);
                     }
                 }
-                ptr_stack = ps.next;
+                node = ps.prev;
             }
             while (!self.isWorklistEmpty()) {
                 const ref = self.removeWorklist();
@@ -135,20 +126,16 @@ pub fn MakeGC(comptime config: GcConfig) type {
             }
         }
 
-        pub fn processObject(self: *Self, ref: *Header) void {
-            config.processFields(@ptrCast(self), ref, processFieldWrapper);
+        pub fn processObject(self: *Self, ref: Object) void {
+            config.processFields(Self, self, ref, processField);
         }
 
-        pub fn processField(self: *Self, field: **Header) void {
+        pub fn processField(self: *Self, field: *Object) void {
             const from_ref = field.*;
             field.* = self.forward(from_ref);
         }
 
-        fn processFieldWrapper(self: *anyopaque, field: **Header) void {
-            processField(@ptrCast(@alignCast((self))), field);
-        }
-
-        pub fn forward(self: *Self, from_ref: *Header) *Header {
+        pub fn forward(self: *Self, from_ref: Object) Object {
             const to_ref = from_ref.getForwardingAddress();
             if (to_ref) |res| {
                 return res;
@@ -157,48 +144,12 @@ pub fn MakeGC(comptime config: GcConfig) type {
             }
         }
 
-        pub fn copy(self: *Self, from_ref: *Header) *Header {
+        pub fn copy(self: *Self, from_ref: Object) Object {
             const to_ref = self.free;
             self.free += objectWordSize(from_ref);
             @memcpy(to_ref, objectWordSlice(from_ref));
             from_ref.setForwardingAddress(@ptrCast(to_ref));
             return @ptrCast(to_ref);
-        }
-
-        pub fn addPointerStack(self: *Self, ptr_stack: *PointerStack) void {
-            ptr_stack.next = self.pointer_stack;
-            self.pointer_stack = ptr_stack;
-        }
-    };
-}
-
-pub fn MakeP(comptime GC: type) type {
-    return struct {
-        pub fn P(comptime N: usize) type {
-            return struct {
-                pub const Self = @This();
-
-                pointers: [N]?**Header,
-                pointer_stack: PointerStack,
-
-                pub fn init(pointers: [N]?**Header) Self {
-                    return .{
-                        .pointers = pointers,
-                        .pointer_stack = undefined,
-                    };
-                }
-
-                pub fn enter(self: *Self, gc: *GC) void {
-                    self.pointer_stack.pointers = &self.pointers;
-                    self.pointer_stack.next = gc.pointer_stack;
-                    gc.pointer_stack = &self.pointer_stack;
-                }
-
-                pub fn exit(self: *Self, gc: *GC) void {
-                    _ = self;
-                    gc.pointer_stack = gc.pointer_stack.?.next;
-                }
-            };
         }
     };
 }

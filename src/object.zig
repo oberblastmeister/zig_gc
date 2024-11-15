@@ -6,61 +6,58 @@ pub const RecordInfoTable = struct {
     pointers_num: usize,
 };
 
-pub const InfoTable = struct {
+pub const InfoTable = union(enum) {
     const Self = @This();
 
     // use a pointers-first layout
     // `pointers_num` pointers come first, and then data is after.
     // the total size in words of the object including the pointers and data is `size`.
-    tag: usize,
-    body: union {
-        record: RecordInfoTable,
-        custom: void,
-    },
+    record: RecordInfoTable,
+    array: void,
+    bytes: void,
 };
 
-pub const Header = extern struct {
+pub const Header = extern union {
     const Self = @This();
 
     const FORWARD_MASK: usize = 0b1;
 
-    _info_table: ?*anyopaque,
+    info_table: *const InfoTable,
+    forwarded: usize,
 
     // precondition: must not be forwarded
-    pub inline fn infoTable(self: *Self) *InfoTable {
+    pub inline fn infoTable(self: Self) *const InfoTable {
         std.debug.assert(!self.isForwarded());
-        const ptr: *align(@alignOf(InfoTable)) anyopaque = @alignCast(self._info_table.?);
-        return @ptrCast(ptr);
+        return self.info_table;
     }
 
-    pub inline fn isForwarded(self: *Self) bool {
-        const ptr: usize = @intFromPtr(self._info_table);
-        return (ptr & FORWARD_MASK) == 1;
+    pub inline fn isForwarded(self: Self) bool {
+        return (self.forwarded & FORWARD_MASK) == 1;
     }
 
-    pub inline fn getForwardingAddress(self: *Self) ?*Header {
+    pub inline fn getForwardingAddress(self: Self) ?Object {
         if (self.isForwarded()) {
-            const ptr: usize = @intFromPtr(self._info_table);
-            return @ptrFromInt(ptr & ~FORWARD_MASK);
+            return @ptrFromInt(self.forwarded & ~FORWARD_MASK);
         } else {
             return null;
         }
     }
 
     pub inline fn setForwardingAddress(self: *Self, ptr: *Header) void {
-        const ptr1: usize = @intFromPtr(ptr);
-        self._info_table = @ptrFromInt(ptr1 | FORWARD_MASK);
+        self.forwarded = @intFromPtr(ptr) | FORWARD_MASK;
     }
 
-    pub fn getInfoTableRecord(self: *Self) *RecordInfoTable {
-        return &self.infoTable().body.record;
+    pub fn getInfoTableRecord(self: Self) *RecordInfoTable {
+        return &self.infoTable().record;
     }
 
     pub inline fn getRecordPointers(self: *Self) []*Self {
-        const pointers_start = @as([*]Self, @ptrCast(self)) + 1;
-        return (@as([*]*Self, @ptrCast(pointers_start)))[0..self.infoTable().body.record.pointers_num];
+        // skip the header
+        return (@as([*]*Self, @ptrCast(self)))[1 .. self.infoTable().record.pointers_num + 1];
     }
 };
+
+pub const Object = *Header;
 
 comptime {
     std.debug.assert(@alignOf(usize) >= @alignOf(usize));

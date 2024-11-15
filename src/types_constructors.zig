@@ -27,9 +27,20 @@ pub fn Make(comptime GC: type) type {
             pub fn create(gc: *GC, size: usize) *types.Array {
                 const raw_ptr = gc.allocRaw(2 + size);
                 const ptr: *types.Array = @ptrCast(raw_ptr);
-                ptr._info_table = @constCast(&types.array_info_table);
+                ptr.header = .{ .info_table = &types.array_info_table };
                 ptr.size = size;
                 @memset(ptr.items(), null);
+                return ptr;
+            }
+        };
+
+        pub const Bytes = struct {
+            pub fn create(gc: *GC, size: usize) *types.Bytes {
+                const bytes_size = size + (size & 0b111);
+                const ptr: *types.Bytes = @ptrCast(gc.allocRaw(bytes_size / 8 + 2));
+                ptr.header = .{ .info_table = &types.bytes_info_table };
+                ptr.size = size;
+                @memset(ptr.items(), 0);
                 return ptr;
             }
         };
