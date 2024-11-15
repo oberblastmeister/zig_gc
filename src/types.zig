@@ -38,7 +38,7 @@ pub fn objectSize(ref: *Header) usize {
         Tag.array => {
             const array: *Array = @ptrCast(ref);
             // include the info table in the size
-            return 1 + array.size;
+            return 2 + array.size;
         },
     }
 }

@@ -25,11 +25,11 @@ pub fn Make(comptime GC: type) type {
 
         pub const Array = struct {
             pub fn create(gc: *GC, size: usize) *types.Array {
-                const raw_ptr = gc.allocRaw(1 + size);
-                @memset(raw_ptr[0..(1 + size)], 0);
+                const raw_ptr = gc.allocRaw(2 + size);
                 const ptr: *types.Array = @ptrCast(raw_ptr);
                 ptr._info_table = @constCast(&types.array_info_table);
                 ptr.size = size;
+                @memset(ptr.items(), null);
                 return ptr;
             }
         };
