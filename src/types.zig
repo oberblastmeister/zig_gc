@@ -67,14 +67,14 @@ pub const array_info_table = InfoTable{
 };
 
 pub const Int = extern struct {
-    _info_table: *InfoTable,
+    header: *Header,
     value: usize,
 
     const Self = @This();
 };
 
 pub const Pair = extern struct {
-    _info_table: *InfoTable,
+    header: Header,
     first: *Header,
     second: *Header,
 
@@ -82,7 +82,7 @@ pub const Pair = extern struct {
 };
 
 pub const Array = extern struct {
-    _info_table: *InfoTable,
+    header: Header,
     // the size of the array not including the header
     size: usize,
 

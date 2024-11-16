@@ -27,7 +27,7 @@ pub fn Make(comptime GC: type) type {
             pub fn create(gc: *GC, size: usize) *types.Array {
                 const raw_ptr = gc.allocRaw(2 + size);
                 const ptr: *types.Array = @ptrCast(raw_ptr);
-                ptr._info_table = @constCast(&types.array_info_table);
+                ptr.header._info_table = @constCast(&types.array_info_table);
                 ptr.size = size;
                 @memset(ptr.items(), null);
                 return ptr;

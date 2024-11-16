@@ -19,6 +19,8 @@ pub const InfoTable = struct {
     },
 };
 
+pub const Object = *Header;
+
 pub const Header = extern struct {
     const Self = @This();
 
@@ -27,7 +29,7 @@ pub const Header = extern struct {
     _info_table: ?*anyopaque,
 
     // precondition: must not be forwarded
-    pub inline fn infoTable(self: *Self) *InfoTable {
+    pub inline fn infoTable(self: *Self) *const InfoTable {
         std.debug.assert(!self.isForwarded());
         const ptr: *align(@alignOf(InfoTable)) anyopaque = @alignCast(self._info_table.?);
         return @ptrCast(ptr);
@@ -52,7 +54,7 @@ pub const Header = extern struct {
         self._info_table = @ptrFromInt(ptr1 | FORWARD_MASK);
     }
 
-    pub fn getInfoTableRecord(self: *Self) *RecordInfoTable {
+    pub fn getInfoTableRecord(self: *Self) *const RecordInfoTable {
         return &self.infoTable().body.record;
     }
 
