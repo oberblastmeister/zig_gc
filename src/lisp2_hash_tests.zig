@@ -1,20 +1,20 @@
 const std = @import("std");
 
 const GcConfig = @import("GcConfig.zig");
+const lisp2_hash = @import("lisp2_hash.zig");
 const object = @import("object.zig");
 const Header = object.Header;
 const Object = object.Object;
 const InfoTable = object.InfoTable;
 const RecordInfoTable = object.InfoTable;
-const semispace = @import("semispace.zig");
 const shadow_stack = @import("shadow_stack.zig");
 const Stack = shadow_stack.Stack;
 const types = @import("types.zig");
 
-const GC = semispace;
+const GC = lisp2_hash;
 
 test "simple" {
-    var gc = try GC.init();
+    var gc = try GC.init(std.heap.c_allocator);
 
     var roots = [_]?*Object{null} ** 100;
     var frame = shadow_stack.Frame{ .pointers = &roots };

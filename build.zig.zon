@@ -27,9 +27,9 @@
             .url = "git+https://github.com/magurotuna/zig-deque#d6e16d02bb7be925468dea172567c41c9a5f4bfc",
             .hash = "1220d1bedf7d5cfc7475842b3d4e8f03f1308be2e724a036677cceb5c4db13c3da3d",
         },
-        .zap = .{
-            .url = "git+https://github.com/zigzap/zap?ref=v0.9.1#ae5c9278335d8e1133cd6d22707323dda712e120",
-            .hash = "12200223d76ab6cd32f75bc2e31463b0b429bb5b2b6fa4ce8f68dea494ca1ec3398b",
+        .zbench = .{
+            .url = "git+https://github.com/hendriknielaender/zBench?ref=v0.9.1#0c595abbd0c9fbd8bb0afe3c5bd832bf9f0aad42",
+            .hash = "1220b19e117897a42abc5e58633766a3be92f9ebade400116afea57957bebe41aed0",
         },
     },
     .paths = .{

@@ -1,22 +1,20 @@
 const std = @import("std");
 
+pub const Tag = enum(usize) { record, array };
+
 pub const RecordInfoTable = struct {
     // number of words that the object takes up
     size: usize,
     pointers_num: usize,
+    // the tag of the constructor, used to distinguish constructors for sumtypes
+    constructor_tag: usize,
 };
 
-pub const InfoTable = struct {
+pub const InfoTable = union(Tag) {
     const Self = @This();
 
-    // use a pointers-first layout
-    // `pointers_num` pointers come first, and then data is after.
-    // the total size in words of the object including the pointers and data is `size`.
-    tag: usize,
-    body: union {
-        record: RecordInfoTable,
-        custom: void,
-    },
+    record: RecordInfoTable,
+    array: void,
 };
 
 pub const Object = *Header;
@@ -25,6 +23,9 @@ pub const Header = extern struct {
     const Self = @This();
 
     const FORWARD_MASK: usize = 0b1;
+    const FORWARD_SHIFT: usize = 0;
+    const MARK_MASK: usize = 0b10;
+    const MARK_SHIFT: usize = 1;
 
     _info_table: ?*anyopaque,
 
@@ -38,6 +39,20 @@ pub const Header = extern struct {
     pub inline fn isForwarded(self: *Self) bool {
         const ptr: usize = @intFromPtr(self._info_table);
         return (ptr & FORWARD_MASK) == 1;
+    }
+
+    pub inline fn isMarked(self: *Self) bool {
+        const ptr: usize = @intFromPtr(self._info_table);
+        return ((ptr >> MARK_SHIFT) & 0b1) == 1;
+    }
+
+    pub inline fn setMarked(self: *Self, marked: bool) void {
+        const ptr: usize = @intFromPtr(self._info_table);
+        if (marked) {
+            self._info_table = @ptrFromInt(ptr | MARK_MASK);
+        } else {
+            self._info_table = @ptrFromInt(ptr & ~MARK_MASK);
+        }
     }
 
     pub inline fn getForwardingAddress(self: *Self) ?*Header {
@@ -54,13 +69,13 @@ pub const Header = extern struct {
         self._info_table = @ptrFromInt(ptr1 | FORWARD_MASK);
     }
 
-    pub fn getInfoTableRecord(self: *Self) *const RecordInfoTable {
-        return &self.infoTable().body.record;
+    pub fn getConstructorTag(self: *Self) usize {
+        return self.infoTable().record.constructor_tag;
     }
 
     pub inline fn getRecordPointers(self: *Self) []*Self {
         const pointers_start = @as([*]Self, @ptrCast(self)) + 1;
-        return (@as([*]*Self, @ptrCast(pointers_start)))[0..self.infoTable().body.record.pointers_num];
+        return (@as([*]*Self, @ptrCast(pointers_start)))[0..self.infoTable().record.pointers_num];
     }
 };
 

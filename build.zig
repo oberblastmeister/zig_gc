@@ -26,12 +26,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const zap = b.dependency("zap", .{
-        .target = target,
-        .optimize = optimize,
-        .openssl = false, // set to true to enable TLS support
-    });
-
+    lib.linkLibC();
     lib.root_module.addImport("zig-deque", zig_deque.module("zig-deque"));
 
     // This declares intent for the library to be installed into the standard
@@ -82,6 +77,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    lib_unit_tests.linkLibC();
     lib_unit_tests.root_module.addImport("zig-deque", zig_deque.module("zig-deque"));
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
@@ -92,8 +88,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    exe_unit_tests.root_module.addImport("zap", zap.module("zap"));
-
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
@@ -102,4 +96,31 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    setupBenchmarks(b, target, optimize);
+}
+
+fn setupBenchmarks(b: *std.Build, target: anytype, optimize: anytype) void {
+    const bench_step = b.step("bench", "Build benchmarks");
+    const benchmark_names = [_][]const u8{"tree"};
+    const zbench = b.dependency("zbench", .{});
+    const zig_gc_mod = b.addModule("zig_gc", .{
+        .target = target,
+        .optimize = optimize,
+        .root_source_file = b.path("src/root.zig"),
+    });
+    for (benchmark_names) |name| {
+        const bench = b.addExecutable(.{
+            .name = name,
+            .root_source_file = b.path(b.fmt("bench/{s}.zig", .{name})),
+            .target = target,
+            .optimize = optimize,
+        });
+        bench.linkLibC();
+        bench.root_module.addImport("zig_gc", zig_gc_mod);
+        bench.root_module.addImport("zbench", zbench.module("zbench"));
+        const install_bench = b.addInstallArtifact(bench, .{});
+        bench_step.dependOn(&bench.step);
+        bench_step.dependOn(&install_bench.step);
+    }
 }
