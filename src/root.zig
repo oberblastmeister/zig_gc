@@ -4,7 +4,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-pub const Lisp2Hash = @import("lisp2_hash.zig");
+pub const MarkCompactHash = @import("mark_compact_hash.zig");
 pub const Semispace = @import("semispace.zig");
 pub const types = @import("types.zig");
 pub const object = @import("object.zig");
@@ -15,10 +15,10 @@ pub const shadow_stack = @import("shadow_stack.zig");
 comptime {
     @setEvalBranchQuota(5000);
 
-    _ = testing.refAllDeclsRecursive(@import("lisp2_hash_tests.zig"));
+    _ = testing.refAllDeclsRecursive(@import("mark_compact_hash_tests.zig"));
     _ = testing.refAllDeclsRecursive(@import("semispace_tests.zig"));
 
-    // _ = testing.refAllDeclsRecursive(@import("lisp2_hash.zig"));
+    // _ = testing.refAllDeclsRecursive(@import("mark_compact_hash.zig"));
     // _ = testing.refAllDeclsRecursive(@import("object.zig"));
     // _ = testing.refAllDeclsRecursive(@import("types.zig"));
     // _ = testing.refAllDeclsRecursive(@import("semispace.zig"));

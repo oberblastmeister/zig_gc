@@ -192,7 +192,7 @@ fn run_semispace(allocator: std.mem.Allocator) !void {
 fn run_mark_compact(allocator: std.mem.Allocator) !void {
     _ = allocator;
 
-    var lisp2 = try zgc.Lisp2Hash.init(std.heap.c_allocator);
+    var lisp2 = try zgc.MarkCompactHash.init(std.heap.c_allocator);
     defer lisp2.deinit();
     defer lisp2.collect();
 

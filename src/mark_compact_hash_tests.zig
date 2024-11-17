@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const GcConfig = @import("GcConfig.zig");
-const lisp2_hash = @import("lisp2_hash.zig");
+const mark_compact_hash = @import("mark_compact_hash.zig");
 const object = @import("object.zig");
 const Header = object.Header;
 const Object = object.Object;
@@ -11,7 +11,7 @@ const shadow_stack = @import("shadow_stack.zig");
 const Stack = shadow_stack.Stack;
 const types = @import("types.zig");
 
-const GC = lisp2_hash;
+const GC = mark_compact_hash;
 
 test "simple" {
     var gc = try GC.init(std.heap.c_allocator);
