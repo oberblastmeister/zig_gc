@@ -27,6 +27,21 @@ fn createLeafNode(gc: anytype, value_: Object) Object {
     return result;
 }
 
+fn createIntLeafNode(gc: anytype, value: usize) Object {
+    var roots = [_]?*Object{null} ** 10;
+    var frame = shadow_stack.Frame{ .pointers = &roots };
+    gc.stack.push(&frame);
+    defer gc.stack.pop();
+
+    var value_obj = types.toObject(types.createRecord(gc, types.Int, .{ .value = value }));
+    frame.push(&value_obj);
+
+    var result = createLeafNode(gc, value_obj);
+    frame.push(&result);
+
+    return result;
+}
+
 fn makeTree(gc: anytype, depth: usize) Object {
     var roots = [_]?*Object{null} ** 10;
     var frame = shadow_stack.Frame{ .pointers = &roots };
@@ -87,9 +102,42 @@ fn populateTreeMut(gc: anytype, tree_: *types.BinaryTree.Node, depth: usize) voi
     }
 }
 
+fn treeSize(i: usize) usize {
+    return @shlExact(@as(usize, 1), @intCast(i + 1)) - 1;
+}
+
+fn numIters(i: usize) usize {
+    return 2 * treeSize(stretch_tree_depth) / treeSize(i);
+}
+
+fn timeConstruction(gc: anytype, depth: usize) void {
+    var roots = [_]?*Object{null} ** 10;
+    var frame = shadow_stack.Frame{ .pointers = &roots };
+    gc.stack.push(&frame);
+    defer gc.stack.pop();
+
+    const num_iters = numIters(depth);
+
+    var temp_tree = createIntLeafNode(gc, 1234);
+    frame.push(&temp_tree);
+
+    for (0..num_iters) |_| {
+        populateTreeMut(gc, @ptrCast(temp_tree), depth);
+        temp_tree = createIntLeafNode(gc, 1234);
+    }
+
+    for (0..num_iters) |_| {
+        temp_tree = makeTree(gc, depth);
+        temp_tree = createIntLeafNode(gc, 1234);
+    }
+}
+
 // about 16Mb
 const stretch_tree_depth: usize = 18; // about 16Mb
 const long_lived_array_size: usize = 500000;
+const max_tree_depth: usize = 16;
+const long_lived_tree_depth: usize = 16;
+const min_tree_depth: usize = 4;
 
 fn treeBench(gc: anytype) void {
     var roots = [_]?*Object{null} ** 10;
@@ -97,16 +145,15 @@ fn treeBench(gc: anytype) void {
     gc.stack.push(&frame);
     defer gc.stack.pop();
 
+    // Stretch the memory space quickly
     _ = makeTree(gc, stretch_tree_depth);
 
-    var obj = types.toObject(types.createRecord(gc, types.Int, .{ .value = 0 }));
-    frame.push(&obj);
-
-    var long_lived_tree = createLeafNode(gc, obj);
+    // Create a long lived object
+    var long_lived_tree = createIntLeafNode(gc, 9999999999);
     frame.push(&long_lived_tree);
+    populateTreeMut(gc, @ptrCast(long_lived_tree), long_lived_tree_depth);
 
-    populateTreeMut(gc, @ptrCast(long_lived_tree), stretch_tree_depth - 2);
-
+    // Create long-lived array, filling half of it
     var long_lived_array = types.Array.create(gc, long_lived_array_size);
     var array_obj = types.toObject(long_lived_array);
     frame.push(&array_obj);
@@ -117,8 +164,15 @@ fn treeBench(gc: anytype) void {
     }
 
     for (0..long_lived_array_size) |i| {
-        if (i % 7 == 0) {
+        if (i % 2 == 0) {
             long_lived_array.items()[i] = null;
+        }
+    }
+
+    {
+        var d: usize = min_tree_depth;
+        while (d <= max_tree_depth) : (d += 1) {
+            timeConstruction(gc, d);
         }
     }
 }
@@ -132,7 +186,7 @@ fn run_semispace(allocator: std.mem.Allocator) !void {
 
     treeBench(&semispace);
 
-    // std.debug.print("Collected {} times\n", .{semispace.stats.collections});
+    std.debug.print("Collected {} times\n", .{semispace.stats.collections});
 }
 
 fn run_mark_compact(allocator: std.mem.Allocator) !void {
@@ -144,7 +198,7 @@ fn run_mark_compact(allocator: std.mem.Allocator) !void {
 
     treeBench(&lisp2);
 
-    // std.debug.print("Collected {} times\n", .{lisp2.stats.collections});
+    std.debug.print("Collected {} times\n", .{lisp2.stats.collections});
 }
 
 fn bench_semispace(allocator: std.mem.Allocator) void {

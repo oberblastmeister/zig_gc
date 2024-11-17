@@ -125,7 +125,7 @@ pub fn markAll(self: *Self) void {
         for (ps.pointers) |it| {
             if (it) |field| {
                 const obj = field.*;
-                debug.assert(!obj.isMarked());
+                // debug.assert(!obj.isMarked());
                 if (!obj.isMarked()) {
                     self.markObject(obj);
                 }
