@@ -13,12 +13,16 @@ const RecordInfoTable = object.InfoTable;
 const shadow_stack = @import("shadow_stack.zig");
 const types = @import("types.zig");
 
-pub const heap_size = 4096 * 1024;
+pub const heap_size = 32 * 1024 * 1024;
 
 pub const Self = @This();
 
 const ForwardingMap = std.AutoHashMap(u32, u32);
 const WorkList = std.ArrayList(Object);
+
+pub const Stats = struct {
+    collections: usize = 0,
+};
 
 stack: shadow_stack.Stack,
 heap: []usize,
@@ -26,6 +30,7 @@ free: usize,
 backing_allocator: mem.Allocator,
 forwarding_map: ForwardingMap,
 worklist: WorkList,
+stats: Stats,
 
 pub fn objectWordSize(ref: Object) usize {
     const marked = ref.isMarked();
@@ -50,6 +55,7 @@ pub fn init(backing_allocator: mem.Allocator) !Self {
         .backing_allocator = backing_allocator,
         .forwarding_map = ForwardingMap.init(backing_allocator),
         .worklist = WorkList.init(backing_allocator),
+        .stats = .{},
     };
 }
 
@@ -107,6 +113,8 @@ pub fn allocRecord(self: *Self, info_table: *const InfoTable) Object {
 }
 
 pub fn collect(self: *Self) void {
+    self.stats.collections += 1;
+
     self.markAll();
     self.compact();
 }

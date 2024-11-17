@@ -19,9 +19,13 @@ pub fn objectWordSlice(ref: Object) []usize {
     return ptr[0..objectWordSize(ref)];
 }
 
-pub const heap_size = 4096 * 1024;
+pub const heap_size = 32 * 1024 * 1024;
 
 const Self = @This();
+
+pub const Stats = struct {
+    collections: usize = 0,
+};
 
 stack: shadow_stack.Stack,
 heap: []usize,
@@ -31,6 +35,7 @@ extent: usize,
 top: [*]usize,
 free: [*]usize,
 scan: [*]usize,
+stats: Stats,
 
 pub fn init() !Self {
     const heap = try std.heap.page_allocator.alloc(usize, heap_size / @sizeOf(usize));
@@ -48,6 +53,7 @@ pub fn init() !Self {
         .top = top,
         .free = to_space,
         .scan = undefined,
+        .stats = .{},
     };
 }
 
@@ -123,6 +129,8 @@ fn removeWorklist(self: *Self) Object {
 }
 
 pub fn collect(self: *Self) void {
+    self.stats.collections += 1;
+
     self.flip();
     self.initWorklist();
     var frame = self.stack.node;

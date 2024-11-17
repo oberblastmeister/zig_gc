@@ -6,6 +6,12 @@ pub const Frame = struct {
 
     next: ?*Self = null,
     pointers: []?*Object,
+    offset: usize = 0,
+
+    pub fn push(self: *Self, root: *Object) void {
+        self.pointers[self.offset] = root;
+        self.offset += 1;
+    }
 
     // fn init(pointers: []*Object) Self {
     //     return Self{

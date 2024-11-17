@@ -4,8 +4,13 @@
 const std = @import("std");
 const testing = std.testing;
 
-const lisp2_hash = @import("lisp2_hash.zig");
-const semispace = @import("semispace.zig");
+pub const Lisp2Hash = @import("lisp2_hash.zig");
+pub const Semispace = @import("semispace.zig");
+pub const types = @import("types.zig");
+pub const object = @import("object.zig");
+pub const Object = object.Object;
+pub const Header = object.Header;
+pub const shadow_stack = @import("shadow_stack.zig");
 
 comptime {
     @setEvalBranchQuota(5000);

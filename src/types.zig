@@ -89,6 +89,8 @@ pub const Array = extern struct {
 };
 
 pub const BinaryTree = struct {
+    pub const Self = @This();
+
     pub const Tag = enum(usize) {
         empty,
         node,
@@ -97,7 +99,7 @@ pub const BinaryTree = struct {
     pub const Empty = extern struct {
         header: Header,
 
-        pub const info_table = genRecordInfoTableWithConstructorTag(@This(), @intFromEnum(@This().Tag.empty));
+        pub const info_table = genRecordInfoTableWithConstructorTag(@This(), @intFromEnum(Self.Tag.empty));
     };
 
     pub const Node = extern struct {
@@ -106,7 +108,7 @@ pub const BinaryTree = struct {
         value: Object,
         right: Object,
 
-        pub const info_table = genRecordInfoTableWithConstructorTag(@This(), @intFromEnum(@This().Tag.node));
+        pub const info_table = genRecordInfoTableWithConstructorTag(@This(), @intFromEnum(Self.Tag.node));
     };
 };
 

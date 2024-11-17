@@ -98,6 +98,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_exe_unit_tests.step);
 
     setupBenchmarks(b, target, optimize);
+
+    const check = b.step("check", "Check if it compiles");
+    check.dependOn(&lib_unit_tests.step);
 }
 
 fn setupBenchmarks(b: *std.Build, target: anytype, optimize: anytype) void {
