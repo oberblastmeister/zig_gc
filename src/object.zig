@@ -26,14 +26,16 @@ pub const Header = extern struct {
     const FORWARD_SHIFT: usize = 0;
     const MARK_MASK: usize = 0b10;
     const MARK_SHIFT: usize = 1;
+    const BITS_MASK: usize = 0b111;
 
     _info_table: ?*anyopaque,
 
     // precondition: must not be forwarded
     pub inline fn infoTable(self: *Self) *const InfoTable {
         std.debug.assert(!self.isForwarded());
-        const ptr: *align(@alignOf(InfoTable)) anyopaque = @alignCast(self._info_table.?);
-        return @ptrCast(ptr);
+        const ptr: usize = @intFromPtr(self._info_table);
+        // clear the least significant three bits
+        return @ptrFromInt(ptr & ~BITS_MASK);
     }
 
     pub inline fn isForwarded(self: *Self) bool {

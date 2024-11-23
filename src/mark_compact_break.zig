@@ -31,9 +31,14 @@ backing_allocator: mem.Allocator,
 forwarding_map: ForwardingMap,
 worklist: WorkList,
 stats: Stats,
+firstUsedChunkSize: usize,
 
 pub fn objectWordSize(ref: Object) usize {
-    return types.objectSize(ref);
+    const marked = ref.isMarked();
+    ref.setMarked(false);
+    const res = types.objectSize(ref);
+    ref.setMarked(marked);
+    return res;
 }
 
 pub fn objectWordSlice(ref: Object) []usize {
@@ -52,6 +57,7 @@ pub fn init(backing_allocator: mem.Allocator) !Self {
         .forwarding_map = ForwardingMap.init(backing_allocator),
         .worklist = WorkList.init(backing_allocator),
         .stats = .{},
+        .firstUsedChunk = undefined,
     };
 }
 
@@ -178,6 +184,15 @@ pub fn getObject(self: *Self, index: usize) Object {
     return @ptrCast(&self.heap[index]);
 }
 
+const BreakTableItem = struct {
+    from: u32,
+    to: u32,
+};
+
+comptime {
+    assert(@sizeOf(BreakTableItem) == @sizeOf(usize));
+}
+
 pub fn computeLocations(self: *Self) usize {
     var scan: usize = 0;
     var free: usize = 0;
@@ -192,6 +207,13 @@ pub fn computeLocations(self: *Self) usize {
         scan += obj_size;
     }
     return free;
+}
+
+pub fn computeLocationsBreak(self: *Self) usize {
+    var cur: usize = 0;
+    const end = self.free;
+
+    while (cur < end) : (cur += objectWordSize(self.getObject(cur))) {}
 }
 
 pub fn updateReferences(self: *Self) void {
@@ -211,11 +233,13 @@ pub fn updateReferences(self: *Self) void {
         const obj = self.getObject(scan);
         const obj_size = objectWordSize(obj);
         if (obj.isMarked()) {
+            obj.setMarked(false);
             types.processFields(@ptrCast(self), obj, struct {
                 pub fn F(gc: *anyopaque, field: *Object) void {
                     field.* = @as(*Self, @ptrCast(@alignCast(gc))).getForward(field.*);
                 }
             }.F);
+            obj.setMarked(true);
         }
         scan += obj_size;
     }

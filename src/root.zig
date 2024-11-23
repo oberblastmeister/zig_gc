@@ -17,6 +17,7 @@ comptime {
 
     _ = testing.refAllDeclsRecursive(@import("mark_compact_hash_tests.zig"));
     _ = testing.refAllDeclsRecursive(@import("semispace_tests.zig"));
+    _ = testing.refAllDeclsRecursive(@import("immix.zig"));
 
     // _ = testing.refAllDeclsRecursive(@import("mark_compact_hash.zig"));
     // _ = testing.refAllDeclsRecursive(@import("object.zig"));
