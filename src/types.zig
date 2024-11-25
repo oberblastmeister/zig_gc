@@ -70,18 +70,17 @@ pub const Array = extern struct {
         .array = {},
     };
 
-    pub fn items(self: *Self) []?*Header {
+    pub fn items(self: *Self) []?Object {
         const size = self.size;
         var ptr: [*]Self = @ptrCast(self);
         ptr += 1;
-        const xs: [*]?*Header = @ptrCast(ptr);
+        const xs: [*]?Object = @ptrCast(ptr);
         return xs[0..size];
     }
 
     pub fn create(gc: anytype, size: usize) *@This() {
-        const raw_ptr = gc.allocRaw(2 + size);
+        const raw_ptr = gc.allocObject(&info_table, 2 + size);
         const ptr: *@This() = @ptrCast(raw_ptr);
-        ptr.header._info_table = @constCast(&info_table);
         ptr.size = size;
         @memset(ptr.items(), null);
         return ptr;

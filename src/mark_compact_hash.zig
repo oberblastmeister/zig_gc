@@ -84,7 +84,7 @@ pub fn allocRaw_(self: *Self, size: usize) ?[*]usize {
     return self.heap[res..][0..size].ptr;
 }
 
-pub fn allocRaw(self: *Self, size: usize) [*]usize {
+pub fn allocObject(self: *Self, info_table: *const InfoTable, size: usize) Object {
     const ptr = init: {
         if (self.allocRaw_(size)) |ptr| {
             break :init ptr;
@@ -97,15 +97,14 @@ pub fn allocRaw(self: *Self, size: usize) [*]usize {
             }
         }
     };
-    return ptr;
+    const header_ptr: Object = @ptrCast(ptr);
+    header_ptr._info_table = @constCast(@ptrCast(info_table));
+    return header_ptr;
 }
 
 pub fn allocRecord(self: *Self, info_table: *const InfoTable) Object {
     const record_info = &info_table.record;
-    const ptr = self.allocRaw(record_info.size);
-    const header_ptr: Object = @ptrCast(ptr);
-    header_ptr._info_table = @constCast(info_table);
-    return header_ptr;
+    return @ptrCast(self.allocObject(info_table, record_info.size));
 }
 
 pub fn collect(self: *Self) void {

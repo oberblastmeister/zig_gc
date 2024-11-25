@@ -6,6 +6,7 @@ const testing = std.testing;
 
 pub const MarkCompactHash = @import("mark_compact_hash.zig");
 pub const Semispace = @import("semispace.zig");
+pub const Immix = @import("immix.zig");
 pub const types = @import("types.zig");
 pub const object = @import("object.zig");
 pub const Object = object.Object;
@@ -17,7 +18,8 @@ comptime {
 
     _ = testing.refAllDeclsRecursive(@import("mark_compact_hash_tests.zig"));
     _ = testing.refAllDeclsRecursive(@import("semispace_tests.zig"));
-    _ = testing.refAllDeclsRecursive(@import("immix.zig"));
+    // _ = testing.refAllDeclsRecursive(@import("immix.zig"));
+    _ = testing.refAllDeclsRecursive(@import("immix_tests.zig"));
 
     // _ = testing.refAllDeclsRecursive(@import("mark_compact_hash.zig"));
     // _ = testing.refAllDeclsRecursive(@import("object.zig"));

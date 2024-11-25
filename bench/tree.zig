@@ -71,6 +71,8 @@ fn makeTree(gc: anytype, depth: usize) Object {
 }
 
 fn populateTreeMut(gc: anytype, tree_: *types.BinaryTree.Node, depth: usize) void {
+    // std.debug.assert(@intFromPtr(tree_) != 0x2);
+
     var roots = [_]?*Object{null} ** 10;
     var frame = shadow_stack.Frame{ .pointers = &roots };
     gc.stack.push(&frame);
@@ -88,15 +90,26 @@ fn populateTreeMut(gc: anytype, tree_: *types.BinaryTree.Node, depth: usize) voi
 
         var left = createLeafNode(gc, depth_obj);
         frame.push(&left);
+        // std.debug.assert(@intFromPtr(left) != 0x2);
 
         var right = createLeafNode(gc, depth_obj);
+        // std.debug.assert(@intFromPtr(right) != 0x2);
+
+        // std.debug.print("tree addr: {*}\n", .{tree});
+        // std.debug.print("left: {*}\n", .{left});
+        // std.debug.print("right: {*}\n", .{right});
         frame.push(&right);
 
         types.write(gc, tree, "left", left);
         types.write(gc, tree, "right", right);
 
-        populateTreeMut(gc, @ptrCast(types.read(gc, tree, "left")), depth - 1);
-        populateTreeMut(gc, @ptrCast(types.read(gc, tree, "right")), depth - 1);
+        // std.debug.print("left read: {*}\n", .{types.read(gc, tree, "left")});
+        // std.debug.print("right read: {*}\n", .{types.read(gc, tree, "right")});
+
+        const left1: *types.BinaryTree.Node = @ptrCast(types.read(gc, tree, "left"));
+        const right1: *types.BinaryTree.Node = @ptrCast(types.read(gc, tree, "right"));
+        populateTreeMut(gc, left1, depth - 1);
+        populateTreeMut(gc, right1, depth - 1);
 
         return;
     }
@@ -134,7 +147,8 @@ fn timeConstruction(gc: anytype, depth: usize) void {
 
 // about 16Mb
 const stretch_tree_depth: usize = 18; // about 16Mb
-const long_lived_array_size: usize = 500000;
+// const long_lived_array_size: usize = 500000;
+const long_lived_array_size: usize = 4000;
 const max_tree_depth: usize = 16;
 const long_lived_tree_depth: usize = 16;
 const min_tree_depth: usize = 4;
@@ -152,6 +166,10 @@ fn treeBench(gc: anytype) void {
     var long_lived_tree = createIntLeafNode(gc, 9999999999);
     frame.push(&long_lived_tree);
     populateTreeMut(gc, @ptrCast(long_lived_tree), long_lived_tree_depth);
+
+    var long_lived_tree2 = createIntLeafNode(gc, 9999999999);
+    frame.push(&long_lived_tree2);
+    populateTreeMut(gc, @ptrCast(long_lived_tree2), long_lived_tree_depth / 2);
 
     // Create long-lived array, filling half of it
     var long_lived_array = types.Array.create(gc, long_lived_array_size);
@@ -192,13 +210,25 @@ fn run_semispace(allocator: std.mem.Allocator) !void {
 fn run_mark_compact(allocator: std.mem.Allocator) !void {
     _ = allocator;
 
-    var lisp2 = try zgc.MarkCompactHash.init(std.heap.c_allocator);
-    defer lisp2.deinit();
-    defer lisp2.collect();
+    var mark_compact = try zgc.MarkCompactHash.init(std.heap.c_allocator);
+    defer mark_compact.deinit();
+    defer mark_compact.collect();
 
-    treeBench(&lisp2);
+    treeBench(&mark_compact);
 
-    std.debug.print("Collected {} times\n", .{lisp2.stats.collections});
+    std.debug.print("Collected {} times\n", .{mark_compact.stats.collections});
+}
+
+fn run_immix(allocator: std.mem.Allocator) !void {
+    _ = allocator;
+
+    var immix = try zgc.Immix.init(std.heap.c_allocator);
+    defer immix.deinit();
+    defer immix.collect();
+
+    treeBench(&immix);
+
+    std.debug.print("Collected {} times\n", .{immix.stats.collections});
 }
 
 fn bench_semispace(allocator: std.mem.Allocator) void {
@@ -213,9 +243,16 @@ fn bench_mark_compact(allocator: std.mem.Allocator) void {
     }
 }
 
+fn bench_immix(allocator: std.mem.Allocator) void {
+    if (run_immix(allocator)) |_| {} else |err| {
+        std.debug.panic("Failed to run benchmark {}", .{err});
+    }
+}
+
 pub fn main() !void {
     var b = zbench.Benchmark.init(std.heap.c_allocator, .{});
     defer b.deinit();
+    try b.add("Immix", bench_immix, .{});
     try b.add("Semispace", bench_semispace, .{});
     try b.add("Mark-Compact", bench_mark_compact, .{});
     try b.run(std.io.getStdOut().writer());

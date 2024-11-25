@@ -97,13 +97,13 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
 
-    setupBenchmarks(b, target, optimize);
+    setupBenchmarks(b, target, optimize, zig_deque);
 
     const check = b.step("check", "Check if it compiles");
     check.dependOn(&lib_unit_tests.step);
 }
 
-fn setupBenchmarks(b: *std.Build, target: anytype, optimize: anytype) void {
+fn setupBenchmarks(b: *std.Build, target: anytype, optimize: anytype, zig_deque: anytype) void {
     const bench_step = b.step("bench", "Build benchmarks");
     const benchmark_names = [_][]const u8{"tree"};
     const zbench = b.dependency("zbench", .{});
@@ -112,6 +112,7 @@ fn setupBenchmarks(b: *std.Build, target: anytype, optimize: anytype) void {
         .optimize = optimize,
         .root_source_file = b.path("src/root.zig"),
     });
+    zig_gc_mod.addImport("zig-deque", zig_deque.module("zig-deque"));
     for (benchmark_names) |name| {
         const bench = b.addExecutable(.{
             .name = name,

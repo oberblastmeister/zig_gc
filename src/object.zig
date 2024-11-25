@@ -19,6 +19,11 @@ pub const InfoTable = union(Tag) {
 
 pub const Object = *Header;
 
+const SizeClass = enum {
+    small,
+    medium,
+};
+
 pub const Header = extern struct {
     const Self = @This();
 
@@ -27,6 +32,8 @@ pub const Header = extern struct {
     const MARK_MASK: usize = 0b10;
     const MARK_SHIFT: usize = 1;
     const BITS_MASK: usize = 0b111;
+    const MEDIUM_MASK: usize = 0b100;
+    const MEDIUM_SHIFT: usize = 2;
 
     _info_table: ?*anyopaque,
 
@@ -57,6 +64,27 @@ pub const Header = extern struct {
         }
     }
 
+    pub inline fn getSizeClass(self: *Self) SizeClass {
+        const ptr: usize = @intFromPtr(self._info_table);
+        return if (((ptr >> MEDIUM_SHIFT) & 0b1) == 1)
+            .medium
+        else
+            .small;
+    }
+
+    pub inline fn setSizeClass(self: *Self, size: SizeClass) void {
+        const ptr: usize = @intFromPtr(self._info_table);
+        if (size == .medium) {
+            self._info_table = @ptrFromInt(ptr | MEDIUM_MASK);
+        } else {
+            self._info_table = @ptrFromInt(ptr & ~MEDIUM_MASK);
+        }
+    }
+
+    pub inline fn flipMarked(self: *Self) void {
+        self.setMarked(!self.isMarked());
+    }
+
     pub inline fn getForwardingAddress(self: *Self) ?*Header {
         if (self.isForwarded()) {
             const ptr: usize = @intFromPtr(self._info_table);
@@ -82,6 +110,5 @@ pub const Header = extern struct {
 };
 
 comptime {
-    std.debug.assert(@alignOf(usize) >= @alignOf(usize));
-    std.debug.assert(@alignOf(InfoTable) >= @alignOf(usize));
+    std.debug.assert(@alignOf(InfoTable) >= @alignOf(u64));
 }
